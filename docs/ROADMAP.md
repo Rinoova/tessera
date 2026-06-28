@@ -1,9 +1,17 @@
 # Roadmap
 
 ## Phase 1 — local, single host (shipped, this repo)
-Per-scope coordination for concurrent Claude Code agents on one machine: append-only NDJSON awareness bus + Claude hooks + `git worktree` isolation. Zero dependencies. This is the whole of the published tool today. (An opt-in `flock` mode for genuinely-shared, non-git-mergeable files is designed but **not yet implemented**.)
+Per-scope coordination for concurrent Claude Code agents on one machine: append-only NDJSON awareness bus + Claude hooks + `git worktree` isolation. Zero dependencies. This is the whole of the published tool today, on **Linux**. (An opt-in `flock` mode for genuinely-shared, non-git-mergeable files is designed but **not yet implemented**.)
 
-## Phase 2 — multi-host over a mesh (planned, optional layer)
+## Phase 2 — native macOS and Windows 11 (no WSL)
+Run Tessera **natively** on macOS and Windows 11, with an OS-aware installer, so the same skill works wherever Claude Code runs. The awareness core (bus, hooks, scope, reader) is already OS-neutral; the port collapses into one small `lib/os.mjs` abstraction rather than a fork. Staged by effort:
+
+- **macOS — next, low effort.** Claude Code runs hooks via `sh -c` exactly like Linux, and `tmux`/`git`/POSIX signals are all present, so macOS ships the **whole** tool (awareness **and** the launcher). The delta is small: case-insensitive path folding (APFS), an OS-local cache dir, a `/sbin/mount`-based network-fs check, and watching the bus's *parent* directory for the doorbell.
+- **Windows 11 — TBD (the larger work).** No `sh`, no `/proc`, no signals/process-groups. Hooks run `node` directly (forward-slash / exec-form, so no Git Bash needed); the append bus stays correct because Node/libuv's `'a'` flag is a kernel-atomic `FILE_APPEND_DATA` write (no lock needed), with an AV/indexer open-retry. Windows ships **awareness-first** (the `up`/`kill` launcher is deferred, since `wt.exe` can't close windows and there are no signals). It is gated behind **empirical tests on real Windows hardware** (NTFS concurrent-append torture test + live hook-executor check) — which is why it's staged after macOS.
+
+Full design, the shared-vs-branched matrix, and the ship-gate tests are in **[`docs/PORTING.md`](PORTING.md)**.
+
+## Phase 3 — multi-host over a mesh (planned, optional layer)
 Coordinate agents running on **different machines**, keeping the per-scope model unchanged and the local NDJSON file as the **offline source of truth**. Only the *transport* is added; the file bus still works with the network down.
 
 - **Connectivity:** [Nebula](https://github.com/slackhq/nebula) (MIT) — a lightweight, easy-to-install mesh overlay VPN. Hosts reach each other on stable mesh IPs.
@@ -13,7 +21,7 @@ Coordinate agents running on **different machines**, keeping the per-scope model
   - **Rejected: MQTT/Mosquitto** — persistent sessions and retained messages are not a replayable, scan-from-offset log, so it can't back a source-of-truth bus.
 - **Integration sketch (file stays authority):** on each local append, also `XADD tessera:{scope}` carrying the file byte-offset as the shared ordering; remote agents `XREADGROUP ... BLOCK` for real-time cross-host fan-out and `XACK` on apply; a consumed entry is an idempotent *append-if-absent* into the local file. Trim the stream aggressively (`MAXLEN`) since the file is the lossless log. Valkey is a central accelerator/replicator over the mesh, not an HA dependency.
 
-## Phase 3 — out of scope for this repo
+## Phase 4 — central station + mobile/web (out of scope for this repo)
 A central coordination station with a mobile/web control surface is a separate, hosted product concern, not part of this thin OSS tool.
 
 ## Related work
