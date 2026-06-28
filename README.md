@@ -1,5 +1,7 @@
 # Tessera
 
+**English** · [Italiano](README.it.md) · [Español](README.es.md) · [Français](README.fr.md) · [Deutsch](README.de.md) · [Português](README.pt.md) · [简体中文](README.zh-Hans.md) · [日本語](README.ja.md)
+
 **Low-level, zero-dependency coordination for multiple local AI coding agents working in the same folders.**
 
 When you run several [Claude Code](https://docs.claude.com/en/docs/claude-code) agents at once on the same repo, two of them can edit the same file at the same time and silently clobber each other's work. Tessera lets unpredictably-spawned agents **discover each other in real time** and **stop stepping on each other's feet** — per-folder, daemonless, crash-safe, on any project (polyrepo, monorepo, single repo, any language).
