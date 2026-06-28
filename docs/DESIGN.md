@@ -1,27 +1,33 @@
-# AgentSync — design record
+# Tessera — design
 
-This folder preserves the full research → design → verification lineage that produced AgentSync. Read order:
+## Problem
+Run several local AI coding agents (Claude Code sessions) on the same repository at once and two can edit the same file simultaneously, silently clobbering each other. We want unpredictably-spawned agents to discover each other in real time and avoid collisions — per-folder, with no daemon, no dependencies, and no fragile global state.
 
-1. **`05-spec-generic.md`** — the authoritative, portable spec implemented by the code (v11). Start here.
-2. `03-research-findings.md` — deep web research (cited): Linda tuple-centres, OFD/flock, inotify, vector clocks, Redis pub/sub losses, uzi/claude-flow prior art.
-3. `04-host-verification.md` — empirical kernel/runtime verification on this host (flock serialization+auto-release, fs.watch on O_APPEND, realpath -m, hash speed, tmux, PreToolUse DENY contract, settings global-merge, subagents-inherit-PreToolUse-not-SessionStart).
-4. `00-environment.md`, `02-generalization.md` — grounding + the "portable to every project" reframing.
-5. `01-design-hypothesis.md`, `v10-adversarial-spec.md` — the initial hypothesis and the heavy v10 spec from 8 adversarial rounds (rinoova-specific; superseded by 05 after re-generalization + leanness cuts).
+## The decomposition
+Conflict has three classes; each already has a correct tool, so we build only the glue plus the one missing piece:
 
-## How the design was produced
-- **Deep research** (105-agent fan-out, 23 sources, adversarial claim verification).
-- **8 rounds of adversarial design refinement** (7-lens critic panel: crash-safety, perf/cost, scope+spawn correctness, operability, simplicity/reuse, security, prior-art) — every round produced material change.
-- **Empirical host verification** of every load-bearing primitive (higher signal than more web search).
-- **1 final adversarial round** on the re-generalized lean spec → GO with narrow new info → leanness cuts applied.
+1. **Tracked files (in git).** `git worktree` per agent + real `git merge` is the conflict gate. We *adopt* it (`up --isolated`); we don't rebuild it.
+2. **Awareness** — who's active in this folder, what are they touching, did a new agent just appear. No existing lightweight tool does this for *separate* sessions in a *shared* checkout. This is what we *build*: a per-scope append-only NDJSON bus + Claude hooks + `fs.watch`.
+3. **Genuinely-shared, non-git-mergeable files** (gitignored env, generated singletons). `flock(2)` + atomic write through a single locked writer. *Built but opt-in* — off by default.
 
-## Key decisions that survived (and why)
-- **Reuse git, don't rebuild it.** Worktree isolation + `git merge` is the conflict gate for *tracked* files. AgentSync adds awareness on top and (opt-in) flock only for the genuinely-shared files git can't merge.
-- **Byte-offset is the clock.** One host + one append-only file ⇒ a total order. Vector/Lamport clocks are inert under serialization and unsound to GC — dropped. ("Vettoriale" became conflict *visibility*, not literal clocks.)
-- **Append-only NDJSON bus is the source of truth**; any real-time notifier (inotify/`fs.watch`, or future Valkey) is an *advisory* doorbell — reconcile against the log, which is lossless.
-- **Per-scope medium ⇒ structural cross-project invisibility** (Linda tuple-centre).
-- **Hooks are the integration surface.** PreToolUse can DENY+reroute (verified). The userspace hook replaces the root-only `fanotify` gating the research flagged.
-- **Identity:** awareness mode uses the harness `session_id` (hooks are separate short-lived processes, so a kernel pid/starttime triple belongs to the *hook*, not the agent); flock mode uses kernel `/proc/locks` holder + `boot_id:pid:starttime` for kill targeting.
-- **Lean by default:** Tier-1 flock apparatus, Bash-redirection gating, and full doctor are opt-in/deferred — a fresh project gets worktree isolation + the awareness bus only.
+## Key decisions (and why they survived review)
+- **Per-scope medium ⇒ structural cross-project invisibility.** The bus lives inside the project (`<scope>/.tessera/`), so two agents share a medium only when their touched paths resolve into the same scope. This is the Linda tuple-space "local laws, global effect" property: agents not sharing a medium are uncoordinated, for free. `scope` resolution is distance-first (nearest ancestor with a marker), so monorepo subtrees stay independent; `.tessera-scope` is an up-tree override.
+- **Byte-offset is the clock.** One host + one append-only file ⇒ a total order already exists. Vector/Lamport clocks add nothing here and can't be safely garbage-collected, so there are none.
+- **The file is the source of truth; any notifier is advisory.** `fs.watch`/inotify can coalesce or drop events, so the bus is authoritative and readers reconcile against it. A torn write self-heals because every record is framed with a *leading* `\n` (a broken fragment fails `JSON.parse` and is discarded; the next writer's record survives). Appends are atomic (`O_APPEND`, records well under `PIPE_BUF`).
+- **Hooks are the gate.** Claude Code `PreToolUse` can deny/redirect a tool call, which replaces the root-only `fanotify` access-gating an OS-level design would need — entirely in userspace, no privileges.
+- **Identity matches the runtime.** Hooks run as separate short-lived processes, so a kernel pid/starttime triple would identify the *hook*, not the agent. Awareness mode therefore keys on the harness **session id** (stable across a session's hooks); liveness is heartbeat plus, when known, `/proc`. The opt-in `flock` mode uses kernel `/proc/locks` holders for correct teardown targeting.
+- **Lean by default.** A fresh project gets worktree isolation + the awareness bus only. The `flock` writer, shell-redirection gating, and a full health matrix are opt-in.
+- **Unit of coordination = the session.** A single session's parallel sub-agents share its identity (the harness already assigns them distinct files/work); Tessera coordinates *separate* sessions, which is the real "many agents on a folder" case.
 
-## Verified, lean, honest
-All primitives are empirically confirmed on Linux 7.0 / node 24 / flock 2.41 / git 2.53 / tmux 3.6. The threat model is one uid; same-uid availability and secret-value confidentiality are explicitly **not** defended (stated, not pretended). Linux + local-fs only.
+## Threat model
+One uid, single Linux host, local filesystem (advisory locks and inotify are unreliable on network filesystems). Tessera defends data integrity and correct teardown targeting. It does **not** defend against a malicious same-uid process or protect secret *values* — stated, not pretended.
+
+## How it was built
+Deep web research on the primitives and prior art → multiple rounds of adversarial design review (the design kept changing materially, which is why several first-cut ideas — vector clocks, a standalone daemon, a heavyweight store — were cut) → empirical verification of every load-bearing primitive on a real host (flock holding through a wrapped command and auto-releasing on death, `fs.watch` firing on `O_APPEND` extension, the `PreToolUse` deny contract, settings-merge semantics, sub-agents inheriting `PreToolUse` but not `SessionStart`) → a final review pass before publication. The result is intentionally small.
+
+## Related work
+- **claude-flow / ruflo** (MIT) — the closest prior art and the heavyweight counterpart: it coordinates the sub-agents it *orchestrates* through a shared SQLite blackboard (`.swarm/memory.db`) plus an MCP server, hooks, and consensus. Tessera targets the opposite end: thin, zero-dependency, peer awareness for *independently launched* sessions in a shared checkout.
+- **uzi**, **claude-squad**, **vibe-kanban**, **Conductor** — isolation-first orchestrators: one `git worktree` (or workspace) + terminal per agent, conflicts deferred to `git merge`/review. They sidestep the shared-checkout collision Tessera addresses. Because they all run *real* Claude Code, Tessera's hooks fire inside them too — so Tessera composes with them rather than competing.
+
+## Why this fits a "reuse, don't reinvent" philosophy
+At the primitive level Tessera invents nothing: it composes `git`, `flock`, inotify (via Node's `fs.watch`), `tmux`, and NDJSON, and applies a 30-year-old coordination model (tuple spaces / blackboards). The only original contribution is the small awareness layer that none of the existing tools provide — which is exactly what makes it worth publishing.

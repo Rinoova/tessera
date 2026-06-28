@@ -1,11 +1,11 @@
 ---
-name: agentsync
+name: tessera
 description: Use to launch and coordinate MULTIPLE concurrent local Claude Code agents on shared folders/repos without conflicts — spawn many jobs at once, see who else is working where in real time, and avoid two agents clobbering the same files. Activate when the user wants to run several agents in parallel, "launch N agents", parallelize work across a codebase, set up multi-agent coordination, or check which agents are active in a project. Per-scope: agents on different projects stay mutually invisible.
 ---
 
-# AgentSync — coordinate concurrent local agents
+# Tessera — coordinate concurrent local agents
 
-AgentSync lets many Claude Code agents work in the same project at once without stepping on each other. Coordination is **per-scope** (nearest project root): agents in different projects never see each other; agents in the same scope discover each other in real time via an append-only bus and Claude hooks.
+Tessera lets many Claude Code agents work in the same project at once without stepping on each other. Coordination is **per-scope** (nearest project root): agents in different projects never see each other; agents in the same scope discover each other in real time via an append-only bus and Claude hooks.
 
 ## When to use
 - The user wants to **launch several agents in parallel** ("run 3 agents", "parallelize this", "spin up a wave of agents").
@@ -15,23 +15,23 @@ AgentSync lets many Claude Code agents work in the same project at once without 
 ## Mental model (3 modes, pick by what's being edited)
 - **Awareness (default, `--shared`)**: agents share one checkout, announce themselves, and get warned when a peer is editing the same file. Best for collaborative/coupled work.
 - **Isolated (`--isolated`)**: each agent gets its own `git worktree` + branch; `git merge` resolves conflicts. Best for independent parallel work on tracked files.
-- **Flock (opt-in)**: for genuinely-shared, non-git-mergeable files (gitignored env/secrets), declare them in `.agentsync/config.json` `tier1` globs; writes are serialized through `agentsync put`.
+- **Flock (opt-in)**: for genuinely-shared, non-git-mergeable files (gitignored env/secrets), declare them in `.tessera/config.json` `tier1` globs; writes are serialized through `tessera put`.
 
 ## Commands
 ```bash
-agentsync install --global            # once: wire hooks into ~/.claude (dormant until a project opts in)
-agentsync install --scope .           # opt the current project in
-agentsync up --task "DESC" -n K        # launch K agents (default --shared). Add --isolated / --dry-run / --print
-agentsync ps [--follow] [--all]        # live status: who's active, what they touch, overlaps. --follow = real-time
-agentsync kill <label>                 # safe teardown (e.g. wave1.2)
-agentsync doctor                       # health check
+tessera install --global            # once: wire hooks into ~/.claude (dormant until a project opts in)
+tessera install --scope .           # opt the current project in
+tessera up --task "DESC" -n K        # launch K agents (default --shared). Add --isolated / --dry-run / --print
+tessera ps [--follow] [--all]        # live status: who's active, what they touch, overlaps. --follow = real-time
+tessera kill <label>                 # safe teardown (e.g. wave1.2)
+tessera doctor                       # health check
 ```
 
 ## How to drive it
-1. If not installed: `agentsync install --global` then `agentsync install --scope .` in the target project.
-2. Launch a wave: `agentsync up --task "<clear task>" -n <K>` (use `--isolated` if the agents will heavily edit the same tracked files; `--dry-run` first to preview collisions).
-3. Monitor: `agentsync ps --follow`. Each row shows a ready `agentsync kill <label>`.
-4. As an agent yourself, before rewriting a hot/shared file, run `agentsync ps` to see if a peer is already on it; coordinate (pick a different file, or wait) rather than overwrite.
+1. If not installed: `tessera install --global` then `tessera install --scope .` in the target project.
+2. Launch a wave: `tessera up --task "<clear task>" -n <K>` (use `--isolated` if the agents will heavily edit the same tracked files; `--dry-run` first to preview collisions).
+3. Monitor: `tessera ps --follow`. Each row shows a ready `tessera kill <label>`.
+4. As an agent yourself, before rewriting a hot/shared file, run `tessera ps` to see if a peer is already on it; coordinate (pick a different file, or wait) rather than overwrite.
 
 ## Coordination etiquette for agents
 - The SessionStart hook injects "N other agents active here, touching X" — heed it.

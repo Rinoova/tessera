@@ -11,7 +11,7 @@ import { statePaths, listPresence, removePresence } from '../lib/coord.mjs'
 export async function run(argv) {
   const a = parseArgs(argv, {})
   const label = a._[0]
-  if (!label) throw new Error('usage: agentsync kill <label>')
+  if (!label) throw new Error('usage: tessera kill <label>')
   const scope = scopeRoot(realpathM(a.scope || process.cwd()))
   const cfg = loadConfig(scope)
   const wavePath = join(statePaths(scope, cfg).state, 'waves.json')
@@ -32,5 +32,5 @@ export async function run(argv) {
   if (p) removePresence(scope, cfg, p.id)
   if (w) { delete waves[label]; writeFileSync(wavePath, JSON.stringify(waves, null, 2)) }
 
-  if (!acted) console.log(`no live window/pid recorded for "${label}" (already gone, or not launched via agentsync up)`)
+  if (!acted) console.log(`no live window/pid recorded for "${label}" (already gone, or not launched via tessera up)`)
 }

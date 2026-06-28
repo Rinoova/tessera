@@ -1,8 +1,8 @@
 // dummy-agent.mjs — emulates a Claude agent's HOOK lifecycle for end-to-end testing
-// (real `claude` would fire these same hook events). Reads AGENTSYNC_* env set by `up`.
+// (real `claude` would fire these same hook events). Reads TESSERA_* env set by `up`.
 import { execFileSync } from 'node:child_process'
 const HOOK = process.env.AS_HOOK
-const sid = process.env.AGENTSYNC_LABEL || ('sim:' + process.pid)
+const sid = process.env.TESSERA_LABEL || ('sim:' + process.pid)
 const cwd = process.cwd()
 const files = (process.env.AS_FILES || 'src/shared.js').split(',')
 const iters = parseInt(process.env.AS_ITERS || '10', 10)

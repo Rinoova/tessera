@@ -17,17 +17,17 @@ const HOOK_EVENTS = {
 }
 
 function isOurs(entry) {
-  return entry?.hooks?.some(h => typeof h.command === 'string' && h.command.includes('agentsync-hook'))
+  return entry?.hooks?.some(h => typeof h.command === 'string' && h.command.includes('tessera-hook') || h.command.includes('agentsync-hook'))
 }
 
 export async function run(argv, { HOOK }) {
   const a = parseArgs(argv, { booleans: ['global', 'auto', 'uninstall'] })
   const settingsPath = join(homedir(), '.claude', 'settings.json')
-  const wrapper = join(dirname(HOOK), 'agentsync-hook.sh') // sh fast-filter → exec node handler
+  const wrapper = join(dirname(HOOK), 'tessera-hook.sh') // sh fast-filter → exec node handler
   const command = `sh ${wrapper}`
 
   if (platform() !== 'linux') {
-    console.warn('⚠ AgentSync awareness mode is cross-platform, but kernel features (flock holders, /proc liveness, pgrp kill) are Linux-only. Proceeding with awareness mode.')
+    console.warn('⚠ Tessera awareness mode is cross-platform, but kernel features (flock holders, /proc liveness, pgrp kill) are Linux-only. Proceeding with awareness mode.')
   }
 
   // Per-scope opt-in
@@ -37,13 +37,13 @@ export async function run(argv, { HOOK }) {
     ensureScope(scope, cfg)
     const git = enclosingGitRoot(scope)
     console.log(`✓ opted-in scope: ${scope}`)
-    console.log(`  created ${scope}/.agentsync/  ${git ? '(+ .gitignore entry)' : '(no git — relying on 0700 + reserved dir name)'}`)
+    console.log(`  created ${scope}/.tessera/  ${git ? '(+ .gitignore entry)' : '(no git — relying on 0700 + reserved dir name)'}`)
   }
 
   if (a.global || a.uninstall) {
     mkdirSync(join(homedir(), '.claude'), { recursive: true })
     if (existsSync(settingsPath)) { // back up before touching the user's global settings
-      const bak = settingsPath + '.agentsync-bak'
+      const bak = settingsPath + '.tessera-bak'
       if (!existsSync(bak)) { copyFileSync(settingsPath, bak); console.log(`  (backed up settings → ${bak})`) }
     }
     const settings = existsSync(settingsPath) ? JSON.parse(readFileSync(settingsPath, 'utf8')) : {}
@@ -63,23 +63,23 @@ export async function run(argv, { HOOK }) {
         settings.hooks[ev].push(entry)
       }
     }
-    if (a.auto) { settings.env ||= {}; settings.env.AGENTSYNC_AUTO = '1' }
+    if (a.auto) { settings.env ||= {}; settings.env.TESSERA_AUTO = '1' }
     writeFileSync(settingsPath, JSON.stringify(settings, null, 2))
     console.log(a.uninstall
-      ? `✓ removed AgentSync hooks from ${settingsPath}`
-      : `✓ installed AgentSync hooks (SessionStart, PreToolUse[${HOOK_EVENTS.PreToolUse}], Stop, SubagentStop, SessionEnd) into ${settingsPath}`)
+      ? `✓ removed Tessera hooks from ${settingsPath}`
+      : `✓ installed Tessera hooks (SessionStart, PreToolUse[${HOOK_EVENTS.PreToolUse}], Stop, SubagentStop, SessionEnd) into ${settingsPath}`)
     if (!a.uninstall) installSkill()
   }
 
   if (!a.global && !a.uninstall && !a.scope && process.cwd()) {
-    console.log('\nNext: `agentsync install --global` to wire hooks everywhere, then `agentsync up --task "..." -n 3`.')
+    console.log('\nNext: `tessera install --global` to wire hooks everywhere, then `tessera up --task "..." -n 3`.')
   }
 }
 
 function installSkill() {
   try {
     const src = join(realpathM(join(import.meta.dirname || '.', '..')), 'skill')
-    const dst = join(homedir(), '.claude', 'skills', 'agentsync')
+    const dst = join(homedir(), '.claude', 'skills', 'tessera')
     if (!existsSync(src)) return
     mkdirSync(dst, { recursive: true })
     for (const f of readdirSync(src)) copyFileSync(join(src, f), join(dst, f))

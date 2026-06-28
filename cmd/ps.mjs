@@ -1,9 +1,9 @@
 // ps — live agents per scope, what each touches, and overlaps. --follow = real-time
-// (foreground fs.watch, zero idle daemon). --all scans for .agentsync scopes under cwd.
+// (foreground fs.watch, zero idle daemon). --all scans for .tessera scopes under cwd.
 import { watch, readdirSync, existsSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { parseArgs } from '../lib/args.mjs'
-import { realpathM, scopeRoot, agentsyncDir, busPath } from '../lib/scope.mjs'
+import { realpathM, scopeRoot, tesseraDir, busPath } from '../lib/scope.mjs'
 import { loadConfig } from '../lib/config.mjs'
 import { listPresence, statePaths } from '../lib/coord.mjs'
 
@@ -21,7 +21,7 @@ function renderScope(scope, cfg, problemsOnly) {
     const overlap = (p.last_ref && byRef[p.last_ref]?.length > 1) ? '  ⚠ OVERLAP' : ''
     const name = (p.label || p.id).slice(0, 18).padEnd(18)
     s += `   ${flag} ${name} ${p._live ? 'live ' : `stale ${age}s`}  ${p.task ? '"' + String(p.task).slice(0, 38) + '"' : ''} ${p.last_ref ? '[' + p.last_ref + ']' : ''}${overlap}\n`
-    s += `       ↳ agentsync kill ${p.label || p.id}\n`
+    s += `       ↳ tessera kill ${p.label || p.id}\n`
   }
   return s
 }
@@ -32,7 +32,7 @@ function findScopes(root) {
     if (depth > 4) return
     let ents
     try { ents = readdirSync(dir, { withFileTypes: true }) } catch { return }
-    if (ents.some(e => e.isDirectory() && e.name === '.agentsync')) out.push(dir)
+    if (ents.some(e => e.isDirectory() && e.name === '.tessera')) out.push(dir)
     for (const e of ents) {
       if (!e.isDirectory() || e.name === 'node_modules' || e.name === '.git' || e.name.startsWith('.')) continue
       walk(join(dir, e.name), depth + 1)

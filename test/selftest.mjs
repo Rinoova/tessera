@@ -22,7 +22,7 @@ ok(!isAlive('garbage'), 'malformed id => dead')
 
 console.log('# scope + enc')
 const sc = scopeRoot(join(__dir, '..', 'lib', 'identity.mjs'))
-ok(sc.endsWith('/agentsync'), `scopeRoot finds the agentsync project root (package.json marker): ${sc}`)
+ok(sc.endsWith('/tessera'), `scopeRoot finds the tessera project root (package.json marker): ${sc}`)
 ok(enc('deploy/.env-shared') === 'deploy%2F.env-shared', 'enc percent-encodes / safely')
 ok(enc('a/../b') === 'a%2F..%2Fb' && !enc('a/../b').includes('/'), 'enc is traversal-free')
 ok(realpathM(join(__dir, 'does-not-exist-yet', 'x')).endsWith('/does-not-exist-yet/x'), 'realpathM tolerates missing tail')

@@ -1,68 +1,73 @@
-# AgentSync
+# Tessera
 
-Portable, low-level coordination for **multiple local Claude Code agents** working on shared folders — so unpredictably-spawned agents discover each other in real time and don't step on each other's feet. Per-scope, daemonless, zero runtime deps, crash-safe. Works in any project (polyrepo, monorepo, single repo, any language).
+**Low-level, zero-dependency coordination for multiple local AI coding agents working in the same folders.**
 
-> Built from deep web research + 8 rounds of adversarial design review + empirical kernel verification. See `docs/DESIGN.md` for the full lineage and rationale.
+When you run several [Claude Code](https://docs.claude.com/en/docs/claude-code) agents at once on the same repo, two of them can edit the same file at the same time and silently clobber each other's work. Tessera lets unpredictably-spawned agents **discover each other in real time** and **stop stepping on each other's feet** — per-folder, daemonless, crash-safe, on any project (polyrepo, monorepo, single repo, any language).
+
+> **Why "Tessera"?** A *tessera* is a single tile in a mosaic. In a *tessellation*, tiles cover the surface with **no gaps and no overlaps** — exactly the goal here: many agents tiling the work, never overlapping. Each agent is a tessera; the shared bus is the mosaic.
 
 ## The idea in one line
 
-Conflict between agents has exactly three classes, and each already has the right tool — so AgentSync builds only the thin glue plus the one genuinely-missing piece:
+Conflict between agents has three classes, and each already has the right tool — so Tessera builds only the thin glue plus the one genuinely-missing piece:
 
-| Class | Tool | AgentSync |
+| Class | Right tool | Tessera |
 |---|---|---|
 | **Tracked files** (in git) | `git worktree` isolation + real `git merge` | **adopts** it (`up --isolated`) |
-| **Awareness** — who's here, what are they touching, did someone just spawn | per-scope append-only **NDJSON bus** + Claude **hooks** + `fs.watch` | **builds** (thin) — the default |
-| **Genuinely-shared files git can't merge** (gitignored env/secrets, generated singletons) | `flock(2)` hard-lock + atomic write | **builds** (opt-in "flock mode") |
+| **Awareness** — who's here, what are they touching, did someone just spawn | a per-scope append-only **NDJSON bus** + Claude **hooks** + `fs.watch` | **builds** (thin) — the default |
+| **Genuinely-shared files git can't merge** (gitignored env, generated singletons) | `flock(2)` lock + atomic write | **builds** (opt-in) |
 
-No vector clocks: on one host a single append-only file's **byte offset is already a total order**. No daemon. No idle cost.
+No vector clocks (on one host a single append-only file's **byte offset is already a total order**). No daemon. No idle cost. Nothing invented at the primitive level — it composes `git`, `flock`, `inotify` (via `fs.watch`), `tmux`, and NDJSON.
 
 ## Why per-folder scoping is automatic
 
-The coordination medium (`<scope>/.agentsync/`) physically lives *inside* the project. Two agents share a medium **iff** the paths they touch resolve into the same scope — so two agents in two different projects share nothing and are mutually invisible, for free. (This is the Linda tuple-centre "local laws, global effect" property — see DESIGN.md.) `scope` = the nearest ancestor bearing a marker (`.agentsync-scope`, `.git`, `package.json`, `go.mod`, `pyproject.toml`, `Cargo.toml`, …), distance-first, so monorepo subtrees stay independent.
+The coordination medium (`<scope>/.tessera/`) lives *inside* the project, so two agents share a medium **only if** the paths they touch resolve into the same scope. Agents in different projects share nothing and are mutually invisible — for free. (This is the Linda tuple-space "local laws, global effect" property.) `scope` = the nearest ancestor bearing a marker (`.tessera-scope`, `.git`, `package.json`, `go.mod`, `pyproject.toml`, `Cargo.toml`, …), distance-first, so monorepo subtrees stay independent.
 
 ## Install
 
 ```bash
-node bin/agentsync.mjs install --global     # merge hooks into ~/.claude/settings.json (backed up); fires everywhere
-# dormant (~2ms sh pre-filter) in every project until one opts in:
-node bin/agentsync.mjs install --scope .     # opt THIS project in (creates .agentsync/, gitignores it)
-# or always-on everywhere:  add  "env": { "AGENTSYNC_AUTO": "1" }  (install --global --auto)
-node bin/agentsync.mjs install --uninstall   # clean removal
+git clone <repo-url> tessera && cd tessera
+node bin/tessera.mjs install --global      # merge hooks into ~/.claude/settings.json (auto-backed-up); fires everywhere
+# dormant (~ms sh pre-filter) in every project until one opts in:
+node bin/tessera.mjs install --scope .      # opt THIS project in (creates .tessera/, gitignores it)
+node bin/tessera.mjs install --uninstall    # clean removal
 ```
+Put `bin/tessera.mjs` on your `PATH` (e.g. symlink it to `~/.local/bin/tessera`) to use `tessera` directly. Zero `npm install` — needs **node ≥18**, plus `git` and `tmux` for the launcher (it falls back to detached spawn without tmux).
 
-## Use — launch & watch many jobs (the human gate)
+## Use — launch & watch many agents
 
 ```bash
-agentsync up --task "split the API module" -n 3        # 3 agents, SHARED checkout, awareness + overlap warnings
-agentsync up --task "migrate to v2" -n 5 --isolated     # 5 agents, each in its own git worktree+branch
-agentsync up --task "..." -n 3 --dry-run                # preview predicted collisions, don't launch
-agentsync ps --follow                                   # real-time dashboard: who's live, what they touch, overlaps
-agentsync ps --all                                      # every participating scope under cwd
-agentsync kill wave1.2                                  # safe teardown (tmux window / process group)
-agentsync doctor                                        # health check
+tessera up --task "split the API module" -n 3      # 3 agents, SHARED checkout, awareness + overlap warnings
+tessera up --task "migrate to v2" -n 5 --isolated   # 5 agents, each in its own git worktree+branch
+tessera up --task "..." -n 3 --dry-run              # preview predicted collisions, don't launch
+tessera ps --follow                                 # real-time dashboard: who's live, what they touch, overlaps
+tessera ps --all                                    # every participating scope under cwd
+tessera kill wave1.2                                # safe teardown (tmux window / process group)
+tessera doctor                                      # health check
 ```
 
-## What you get automatically (via hooks, no agent cooperation required)
+## What you get automatically (via Claude hooks — no agent cooperation needed)
 
-- **SessionStart** → each agent announces itself and is told *"N other agents are active here, touching X, Y"*.
-- **PreToolUse(Edit/Write/NotebookEdit)** → records what each agent is editing; if a live peer is touching the **same file**, the editing agent gets a coordination warning (or a hard DENY under `AGENTSYNC_GUARD=1`).
-- **Stop/SessionEnd** → heartbeat / release.
+- **SessionStart** → each agent announces itself and is told *"N other agents are active here, touching X, Y."*
+- **PreToolUse(Edit/Write/NotebookEdit)** → records what each agent edits; if a live peer is touching the **same file**, the editing agent gets a coordination warning (or a hard block under `TESSERA_GUARD=1`).
+- **Stop / SessionEnd** → heartbeat / release.
 
-Identity is the harness `session_id`; liveness is heartbeat + (when known) `/proc` pid. The bus is append-only, crash-safe (leading-`\n` framing self-heals torn writes), prototype-pollution-safe, and deduped.
+The unit of coordination is the **agent session** (a separate `claude` invocation). The bus is append-only, crash-safe (leading-`\n` framing self-heals torn writes), prototype-pollution-safe, and deduplicated. Identity is the session id; liveness is heartbeat + (when known) `/proc`.
 
-## Threat model (one uid)
+## Scope of guarantees
 
-Defends **data integrity** and **correct kill targeting**. Does **not** defend against a same-uid malicious agent (bus flooding, etc.) or secret-value confidentiality — those are human-kill-only and stated plainly, not papered over. Linux + local filesystem only (advisory locks & inotify are unreliable on NFS).
+Single Linux host, one uid, local filesystem (advisory locks & inotify are unreliable on NFS). Tessera defends **data integrity** and **correct teardown targeting**; it does **not** defend against a malicious same-uid process or protect secret *values* — stated plainly, not pretended. Coordinating agents across *different machines* is a planned optional layer (a network transport over a mesh VPN); today the local file bus is the whole story, deliberately.
 
-## Files
+## Layout
 
 ```
-lib/      scope.mjs identity.mjs bus.mjs proc.mjs coord.mjs config.mjs args.mjs
-hooks/    agentsync-hook.sh (fast pre-filter) → agentsync-hook.mjs (handler)
-cmd/      install up ps kill doctor
-bin/      agentsync.mjs
-test/     selftest.mjs  dummy-agent.mjs
+lib/      scope · identity · bus · proc · coord · config · args
+hooks/    tessera-hook.sh (fast pre-filter) → tessera-hook.mjs (handler)
+cmd/      install · up · ps · kill · doctor
+bin/      tessera.mjs
+test/     selftest.mjs · dummy-agent.mjs
 docs/     DESIGN.md
 ```
 
-Zero npm dependencies. Requires: node ≥18, and for the launcher: `git`, `tmux` (optional — falls back to detached spawn).
+## License
+
+MIT. Contributions welcome.

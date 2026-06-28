@@ -5,7 +5,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { homedir, platform } from 'node:os'
 import { parseArgs } from '../lib/args.mjs'
-import { realpathM, scopeRoot, agentsyncDir, enclosingGitRoot, busPath } from '../lib/scope.mjs'
+import { realpathM, scopeRoot, tesseraDir, enclosingGitRoot, busPath } from '../lib/scope.mjs'
 import { loadConfig } from '../lib/config.mjs'
 
 export async function run(argv) {
@@ -17,24 +17,24 @@ export async function run(argv) {
   const wf = (m) => { warn++; console.log('  ⚠', m) }
   const ff = (m) => { fail++; console.log('  ✗', m) }
 
-  console.log(`AgentSync doctor — scope ${scope}`)
+  console.log(`Tessera doctor — scope ${scope}`)
   platform() === 'linux' ? ok('platform linux (full features)') : wf(`platform ${platform()} — awareness only; kernel features (flock holders, /proc, pgrp kill) are Linux-only`)
 
-  existsSync(agentsyncDir(scope, cfg)) ? ok('.agentsync present (scope opted-in)') : wf('.agentsync absent — run: agentsync install --scope .')
+  existsSync(tesseraDir(scope, cfg)) ? ok('.tessera present (scope opted-in)') : wf('.tessera absent — run: tessera install --scope .')
 
   const git = enclosingGitRoot(scope)
   if (git) {
     try { execFileSync('git', ['-C', scope, 'check-ignore', '-q', busPath(scope, cfg)], { stdio: 'ignore' }); ok('coordination bus is git-ignored') }
-    catch { wf('bus NOT git-ignored — run `agentsync install --scope .` to add the .gitignore line') }
+    catch { wf('bus NOT git-ignored — run `tessera install --scope .` to add the .gitignore line') }
   } else ok('no enclosing git repo (ignore N/A; 0700 + reserved dir name protect it)')
 
   const sp = join(homedir(), '.claude', 'settings.json')
   let hooked = false
-  try { hooked = readFileSync(sp, 'utf8').includes('agentsync-hook.mjs') } catch {}
-  hooked ? ok('global hooks installed in ~/.claude/settings.json') : ff('hooks NOT installed — run `agentsync install --global`')
+  try { hooked = readFileSync(sp, 'utf8').includes('tessera-hook.mjs') } catch {}
+  hooked ? ok('global hooks installed in ~/.claude/settings.json') : ff('hooks NOT installed — run `tessera install --global`')
 
   try {
-    const fst = execFileSync('stat', ['-f', '-c', '%T', agentsyncDir(scope, cfg)], { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim()
+    const fst = execFileSync('stat', ['-f', '-c', '%T', tesseraDir(scope, cfg)], { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim()
     const isNet = /nfs|cifs|smb|9p/i.test(fst)
     isNet ? wf(`coordination dir on ${fst} — flock & inotify are unreliable on network filesystems`) : ok(`coordination dir on local fs (${fst})`)
   } catch {}

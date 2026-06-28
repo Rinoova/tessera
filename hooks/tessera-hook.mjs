@@ -1,4 +1,4 @@
-// agentsync-hook.mjs — the single Claude Code hook handler.
+// tessera-hook.mjs — the single Claude Code hook handler.
 // Reads hook JSON on stdin, dispatches on hook_event_name. Awareness mode:
 // announces presence, records what each agent touches, surfaces live peers.
 // FAIL-OPEN: any internal error exits 0 silently so coordination never blocks an agent.
@@ -27,14 +27,14 @@ try {
   const ev = j.hook_event_name || j.hookEventName
   const id = j.session_id || j.sessionId || `nosid:${j.cwd || process.cwd()}`
   const cwd = j.cwd || process.cwd()
-  const label = process.env.AGENTSYNC_LABEL || null
-  const task = process.env.AGENTSYNC_TASK || null
+  const label = process.env.TESSERA_LABEL || null
+  const task = process.env.TESSERA_TASK || null
 
   if (ev === 'SessionStart') {
     const scope = scopeRoot(cwd)
     const cfg = loadConfig(scope)
     if (!participates(scope, cfg)) pass()
-    const digest = announce(scope, cfg, id, { cwd, label, task, role: process.env.AGENTSYNC_ROLE || 'agent' })
+    const digest = announce(scope, cfg, id, { cwd, label, task, role: process.env.TESSERA_ROLE || 'agent' })
     if (digest) out({ hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: digest } })
     pass()
   }
@@ -52,8 +52,8 @@ try {
     if (!readPresence(scope, cfg, id)) announce(scope, cfg, id, { cwd, label, task })
     recordEdit(scope, cfg, id, tgt, tool)
     const warn = overlapWarning(scope, cfg, id, tgt)
-    if (warn && process.env.AGENTSYNC_GUARD === '1') {
-      out({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: warn + ' (AGENTSYNC_GUARD active) — wait or pick a different file.' } })
+    if (warn && process.env.TESSERA_GUARD === '1') {
+      out({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: warn + ' (TESSERA_GUARD active) — wait or pick a different file.' } })
     }
     if (warn) out({ hookSpecificOutput: { hookEventName: 'PreToolUse', additionalContext: warn } })
     pass()
