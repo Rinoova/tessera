@@ -30,7 +30,7 @@ export async function run(argv) {
 
   const sp = join(homedir(), '.claude', 'settings.json')
   let hooked = false
-  try { hooked = readFileSync(sp, 'utf8').includes('tessera-hook.mjs') } catch {}
+  try { hooked = readFileSync(sp, 'utf8').includes('tessera-hook') } catch {}
   hooked ? ok('global hooks installed in ~/.claude/settings.json') : ff('hooks NOT installed — run `tessera install --global`')
 
   try {

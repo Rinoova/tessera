@@ -59,7 +59,7 @@ export async function run(argv) {
       const wid = execFileSync('tmux', ['new-window', '-d', '-P', '-F', '#{window_id}', '-t', SESSION, '-n', label, windowCmd], { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim()
       waves[label] = { window: wid, started: new Date().toISOString(), task, mode, cwd, cmd: agentCmd }
     } else {
-      const child = spawn('setsid', ['sh', '-c', windowCmd], { detached: true, stdio: 'ignore' })
+      const child = spawn('sh', ['-c', windowCmd], { detached: true, stdio: 'ignore' })
       child.unref()
       waves[label] = { pid: child.pid, started: new Date().toISOString(), task, mode, cwd, cmd: agentCmd }
     }

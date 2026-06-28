@@ -1,7 +1,7 @@
 # Roadmap
 
 ## Phase 1 — local, single host (shipped, this repo)
-Per-scope coordination for concurrent Claude Code agents on one machine: append-only NDJSON awareness bus + Claude hooks + `git worktree` isolation + opt-in `flock` for shared non-mergeable files. Zero dependencies. This is complete and is the whole of the published tool today.
+Per-scope coordination for concurrent Claude Code agents on one machine: append-only NDJSON awareness bus + Claude hooks + `git worktree` isolation. Zero dependencies. This is the whole of the published tool today. (An opt-in `flock` mode for genuinely-shared, non-git-mergeable files is designed but **not yet implemented**.)
 
 ## Phase 2 — multi-host over a mesh (planned, optional layer)
 Coordinate agents running on **different machines**, keeping the per-scope model unchanged and the local NDJSON file as the **offline source of truth**. Only the *transport* is added; the file bus still works with the network down.

@@ -17,7 +17,7 @@ const HOOK_EVENTS = {
 }
 
 function isOurs(entry) {
-  return entry?.hooks?.some(h => typeof h.command === 'string' && h.command.includes('tessera-hook') || h.command.includes('agentsync-hook'))
+  return entry?.hooks?.some(h => typeof h.command === 'string' && (h.command.includes('tessera-hook') || h.command.includes('agentsync-hook')))
 }
 
 export async function run(argv, { HOOK }) {

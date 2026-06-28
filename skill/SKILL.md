@@ -12,10 +12,10 @@ Tessera lets many Claude Code agents work in the same project at once without st
 - The user asks **who is working on what** / wants a live view of active agents.
 - Multiple agents will touch the **same folder** and must not clobber each other.
 
-## Mental model (3 modes, pick by what's being edited)
+## Mental model (2 modes today, + 1 planned)
 - **Awareness (default, `--shared`)**: agents share one checkout, announce themselves, and get warned when a peer is editing the same file. Best for collaborative/coupled work.
 - **Isolated (`--isolated`)**: each agent gets its own `git worktree` + branch; `git merge` resolves conflicts. Best for independent parallel work on tracked files.
-- **Flock (opt-in)**: for genuinely-shared, non-git-mergeable files (gitignored env/secrets), declare them in `.tessera/config.json` `tier1` globs; writes are serialized through `tessera put`.
+- **Flock (planned, not yet shipped)**: for genuinely-shared, non-git-mergeable files (gitignored env), writes would be serialized through a single locked writer. On the roadmap; not in the current release.
 
 ## Commands
 ```bash

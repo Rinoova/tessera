@@ -32,7 +32,7 @@ Two agents coordinate only where their paths overlap; different projects stay mu
 
 const cmd = process.argv[2]
 const rest = process.argv.slice(3)
-const KNOWN = new Set(['install', 'up', 'ps', 'kill', 'doctor', 'put'])
+const KNOWN = new Set(['install', 'up', 'ps', 'kill', 'doctor'])
 
 if (!cmd || cmd === 'help' || cmd === '--help' || cmd === '-h') { console.log(HELP); process.exit(0) }
 if (!KNOWN.has(cmd)) { console.error(`unknown command: ${cmd}\n`); console.log(HELP); process.exit(1) }

@@ -14,7 +14,7 @@ Conflict between agents has three classes, and each already has the right tool �
 |---|---|---|
 | **Tracked files** (in git) | `git worktree` isolation + real `git merge` | **adopts** it (`up --isolated`) |
 | **Awareness** — who's here, what are they touching, did someone just spawn | a per-scope append-only **NDJSON bus** + Claude **hooks** + `fs.watch` | **builds** (thin) — the default |
-| **Genuinely-shared files git can't merge** (gitignored env, generated singletons) | `flock(2)` lock + atomic write | **builds** (opt-in) |
+| **Genuinely-shared files git can't merge** (gitignored env, generated singletons) | `flock(2)` lock + atomic write | **planned** (opt-in flock mode — not in this release) |
 
 No vector clocks (on one host a single append-only file's **byte offset is already a total order**). No daemon. No idle cost. Nothing invented at the primitive level — it composes `git`, `flock`, `inotify` (via `fs.watch`), `tmux`, and NDJSON.
 
@@ -29,9 +29,9 @@ git clone <repo-url> tessera && cd tessera
 node bin/tessera.mjs install --global      # merge hooks into ~/.claude/settings.json (auto-backed-up); fires everywhere
 # dormant (~ms sh pre-filter) in every project until one opts in:
 node bin/tessera.mjs install --scope .      # opt THIS project in (creates .tessera/, gitignores it)
-node bin/tessera.mjs install --uninstall    # clean removal
+node bin/tessera.mjs install --uninstall    # remove the hooks (the skill dir and per-scope .tessera/ are left in place)
 ```
-Put `bin/tessera.mjs` on your `PATH` (e.g. symlink it to `~/.local/bin/tessera`) to use `tessera` directly. Zero `npm install` — needs **node ≥18**, plus `git` and `tmux` for the launcher (it falls back to detached spawn without tmux).
+**Requirements:** Linux, **node ≥18**, the [Claude Code](https://docs.claude.com/en/docs/claude-code) CLI, and `git`; `tmux` is optional (the launcher falls back to a detached spawn without it). To use `tessera` directly, run `npm link` (or `npm install -g .`) in the repo — the `bin` field is already set — or symlink `bin/tessera.mjs` onto your `PATH`. There are no npm dependencies to install.
 
 ## Use — launch & watch many agents
 

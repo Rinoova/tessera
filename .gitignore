@@ -1,4 +1,4 @@
 node_modules/
-*.agentsync-bak
-.agentsync/
+*.tessera-bak
+.tessera/
 *.log
