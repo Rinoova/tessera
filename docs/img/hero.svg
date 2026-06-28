@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="300" viewBox="0 0 880 300" font-family="DejaVu Sans, Arial, sans-serif">
+  <rect x="1" y="1" width="878" height="298" rx="20" fill="#0f172a" stroke="#1e293b" stroke-width="2"/>
+
+  <!-- mosaic: tiles tessellating a region with no gaps, no overlaps -->
+  <g>
+    <rect x="28"  y="46"  width="56" height="56" rx="7" fill="#38bdf8"/>
+    <rect x="88"  y="46"  width="56" height="56" rx="7" fill="#34d399"/>
+    <rect x="148" y="46"  width="56" height="56" rx="7" fill="#fbbf24"/>
+    <rect x="208" y="46"  width="56" height="56" rx="7" fill="#fb7185"/>
+
+    <rect x="28"  y="106" width="56" height="56" rx="7" fill="#a78bfa"/>
+    <rect x="88"  y="106" width="56" height="56" rx="7" fill="#38bdf8" stroke="#f8fafc" stroke-width="3"/>
+    <rect x="148" y="106" width="56" height="56" rx="7" fill="#34d399"/>
+    <rect x="208" y="106" width="56" height="56" rx="7" fill="#fbbf24"/>
+
+    <rect x="28"  y="166" width="56" height="56" rx="7" fill="#fbbf24"/>
+    <rect x="88"  y="166" width="56" height="56" rx="7" fill="#fb7185"/>
+    <rect x="148" y="166" width="56" height="56" rx="7" fill="#818cf8" stroke="#f8fafc" stroke-width="3"/>
+    <rect x="208" y="166" width="56" height="56" rx="7" fill="#38bdf8"/>
+  </g>
+
+  <!-- wordmark + tagline -->
+  <text x="320" y="118" font-size="58" font-weight="700" fill="#f8fafc" letter-spacing="1">Tessera</text>
+  <text x="322" y="160" font-size="20" font-weight="700" fill="#38bdf8">Many agents · one shared folder · no collisions</text>
+  <text x="322" y="196" font-size="19" fill="#94a3b8">Lightweight coordination so several local AI coding</text>
+  <text x="322" y="222" font-size="19" fill="#94a3b8">agents stop overwriting each other's work.</text>
+  <text x="322" y="262" font-size="15" fill="#64748b">tessera (n.) — a mosaic tile. Together: no gaps, no overlaps.</text>
+</svg>

@@ -2,73 +2,122 @@
 
 [English](README.md) · [Italiano](README.it.md) · [Español](README.es.md) · **Français** · [Deutsch](README.de.md) · [Português](README.pt.md) · [简体中文](README.zh-Hans.md) · [日本語](README.ja.md)
 
-**Coordination bas niveau, sans dépendances, pour plusieurs agents de codage IA locaux travaillant dans les mêmes dossiers.**
+<p align="center"><img src="docs/img/hero.png" alt="Tessera — plusieurs agents, un dossier partagé, aucune collision" width="840"></p>
 
-Lorsque vous exécutez plusieurs agents [Claude Code](https://docs.claude.com/en/docs/claude-code) en même temps sur le même dépôt, deux d'entre eux peuvent éditer le même fichier au même moment et écraser silencieusement le travail de l'autre. Tessera permet à des agents lancés de façon imprévisible de **se découvrir mutuellement en temps réel** et de **cesser de se marcher sur les pieds** — par dossier, sans démon, résistant aux plantages, sur n'importe quel projet (polyrepo, monorepo, dépôt unique, n'importe quel langage).
+Tessera vous permet d'exécuter **plusieurs agents de codage IA locaux dans le même dossier en même temps** sans qu'ils n'écrasent silencieusement le travail des uns et des autres. Il est minuscule (zéro dépendance), fonctionne sur n'importe quel projet et ne nécessite aucun service en arrière-plan — la coordination repose sur un fichier partagé et les hooks de [Claude Code](https://docs.claude.com/en/docs/claude-code).
 
-> **Pourquoi « Tessera » ?** Une *tessera* est une seule tuile dans une mosaïque. Dans une *tessellation*, les tuiles recouvrent la surface **sans aucun vide ni aucun chevauchement** — exactement l'objectif ici : de nombreux agents pavant le travail, sans jamais se chevaucher. Chaque agent est une tessera ; le bus partagé est la mosaïque.
+> **Une skill que vous installez une fois, puis oubliez.** Tessera se branche sur Claude Code en tant que skill + hooks. Dans un projet qui ne l'utilise pas, c'est une vérification shell d'une milliseconde environ qui ne fait rien ; dans un projet qui l'utilise, il n'ajoute aucune charge à laquelle vos agents doivent penser — ils n'ont même pas besoin de savoir qu'il est là.
 
-## L'idée en une ligne
+> **Le nom.** Une *tessera* est un unique carreau d'une mosaïque. Dans une *tessellation* (un pavage), les carreaux recouvrent une surface **sans interstices ni chevauchements** — exactement ce que vous attendez de plusieurs agents partageant une même base de code.
 
-Le conflit entre agents se décline en trois classes, et chacune dispose déjà du bon outil — Tessera ne construit donc que la fine glu, plus la seule pièce réellement manquante :
+---
 
-| Classe | Bon outil | Tessera |
+## Le problème
+
+Lancez deux ou trois agents sur le même dépôt et vous vous heurterez, dans cet ordre, à :
+
+1. **L'écrasement silencieux.** Deux agents modifient le même fichier au même instant. La seconde sauvegarde l'emporte ; le travail du premier agent disparaît — sans aucune erreur.
+2. **L'absence de visibilité.** Vous ne pouvez pas voir qui touche à quoi. Vous découvrez la collision plus tard — lors d'un conflit de fusion ou d'un build cassé.
+3. **Les apparitions imprévisibles.** Les agents sont lancés de manière ad hoc (par vous, ou par d'autres agents). Rien ne signale aux agents déjà au travail qu'un nouveau venu vient d'arriver.
+4. **Les outils existants l'esquivent.** La plupart des orchestrateurs multi-agents donnent à chaque agent son propre *git worktree* et laissent `git merge` faire le tri ensuite. Parfait pour du travail totalement indépendant — mais d'aucune aide lorsque les agents doivent collaborer **dans un seul checkout partagé**.
+
+<img src="docs/img/problem.png" alt="Deux agents modifient le même fichier en même temps et l'un écrase silencieusement l'autre" width="840">
+
+<p align="center"><sub><i>Deux agents enregistrent <code>src/api.js</code> au même instant — la seconde écriture l'emporte, le travail du premier agent est perdu, et rien ne vous avertit.</i></sub></p>
+
+---
+
+## L'idée : un tableau partagé
+
+Imaginez une équipe travaillant dans une même pièce. Au mur est accroché un tableau. Chaque fois que quelqu'un commence une tâche, il l'y inscrit — *« Je suis sur `api.js` »* — et chacun jette un coup d'œil au tableau avant de s'emparer d'un fichier.
+
+**Tessera, c'est ce tableau pour vos agents.** Il vit *à l'intérieur* du projet (`<project>/.tessera/`) sous la forme d'un simple journal en ajout-seul. Chaque agent s'y annonce et y inscrit ce qu'il est en train de modifier ; tous les autres agents le lisent en temps réel. Quand deux d'entre eux convoitent le même fichier, celui qui s'apprête à écrire reçoit un avertissement.
+
+<img src="docs/img/blackboard.png" alt="Un tableau partagé où chaque agent inscrit ce qu'il modifie et où ses pairs le lisent en temps réel" width="840">
+
+<p align="center"><sub><i>Chaque agent publie ce qu'il est en train de modifier. Quand le nouveau venu D convoite le fichier de A, le tableau révèle aussitôt le conflit — afin qu'ils se coordonnent au lieu d'entrer en collision.</i></sub></p>
+
+Aucun agent n'a besoin de *connaître* Tessera ni de coopérer délibérément — tout passe par les hooks de Claude Code (voir **Comment ça marche**, ci-dessous).
+
+---
+
+## Portée par dossier — aucun bruit inter-projets
+
+Le tableau vit *dans* le projet, il ne relie donc que les agents qui partagent réellement ce projet. Deux agents dans deux dépôts différents écrivent sur deux tableaux différents et sont **mutuellement invisibles**. Les sous-projets d'un monorepo restent eux aussi indépendants.
+
+<img src="docs/img/scopes.png" alt="Deux projets, chacun avec son propre tableau ; les agents de projets différents sont mutuellement invisibles" width="840">
+
+<p align="center"><sub><i>Deux projets, deux tableaux. Les agents de dossiers différents ne partagent rien et ne se voient jamais — aucun bruit, aucune fausse alerte.</i></sub></p>
+
+Une *portée* (scope) est le dossier le plus proche en remontant l'arborescence qui porte un marqueur (`.git`, `package.json`, `go.mod`, `pyproject.toml`, `Cargo.toml`, …, ou un `.tessera-scope` explicite). Les agents ne se coordonnent que là où les chemins qu'ils touchent tombent dans la **même** portée.
+
+---
+
+## Comment ça marche (sous le capot)
+
+Tessera est délibérément petit. Il repose sur une seule observation : **les conflits sont de trois sortes, et deux d'entre elles disposent déjà d'excellents outils.**
+
+| Type de fichier | Le bon outil | Le rôle de Tessera |
 |---|---|---|
-| **Fichiers suivis** (dans git) | isolation par `git worktree` + véritable `git merge` | l'**adopte** (`up --isolated`) |
-| **Conscience mutuelle** — qui est là, que touchent-ils, quelqu'un vient-il d'être lancé | un **bus NDJSON** en ajout seul par portée + **hooks** Claude + `fs.watch` | le **construit** (fin) — par défaut |
-| **Fichiers réellement partagés que git ne peut pas fusionner** (env gitignoré, singletons générés) | verrou `flock(2)` + écriture atomique | **prévu** (mode flock optionnel — pas dans cette version) |
+| **Fichiers suivis** (dans git) | isolation `git worktree` + vrai `git merge` | **l'adopter** — `tessera up --isolated` donne à chaque agent son propre worktree + branche |
+| **Visibilité** (qui est là, à quoi il touche) | *rien de léger n'existait* | **le construire** — le tableau partagé (le mode par défaut) |
+| **Fichiers partagés que git ne peut pas fusionner** (env gitignoré, singletons générés) | un `flock` + écriture atomique | **prévu** (mode flock opt-in), pas dans cette version |
 
-Pas d'horloges vectorielles (sur un seul hôte, le **décalage en octets** d'un unique fichier en ajout seul constitue déjà un ordre total). Pas de démon. Aucun coût à l'inactivité. Rien d'inventé au niveau des primitives — il compose `git`, `flock`, `inotify` (via `fs.watch`), `tmux` et NDJSON.
+Tessera ne construit donc que la fine pièce manquante — la *visibilité* — et réutilise `git`, `flock`, `inotify` (via `fs.watch` de Node), `tmux` et NDJSON pour le reste. Il n'y a **aucune horloge vectorielle** (sur une seule machine, un unique fichier en ajout-seul constitue déjà un ordre total), **aucun démon** et **aucun coût à vide**.
 
-## Pourquoi le cloisonnement par dossier est automatique
+<img src="docs/img/flow.png" alt="Cycle de vie : un agent s'annonce au démarrage, consulte le tableau avant de modifier, puis se coordonne" width="840">
 
-Le support de coordination (`<scope>/.tessera/`) réside *à l'intérieur* du projet, de sorte que deux agents partagent un support **uniquement si** les chemins qu'ils touchent se résolvent dans la même portée. Les agents de projets différents ne partagent rien et sont mutuellement invisibles — gratuitement. (C'est la propriété « lois locales, effet global » de l'espace de tuples Linda.) `scope` = le plus proche ancêtre portant un marqueur (`.tessera-scope`, `.git`, `package.json`, `go.mod`, `pyproject.toml`, `Cargo.toml`, …), distance d'abord, afin que les sous-arbres d'un monorepo restent indépendants.
+<p align="center"><sub><i>Toute la boucle est automatique : s'annoncer au démarrage, consulter le tableau avant de modifier, se coordonner en cas de conflit — le tout piloté par des hooks, invisible pour l'agent.</i></sub></p>
+
+Quelques précisions pour les curieux :
+
+- **Le tableau est la source de vérité.** NDJSON en ajout-seul ; une écriture interrompue se répare d'elle-même (chaque enregistrement est encadré par un saut de ligne initial), et le lecteur est dédupliqué et protégé contre la pollution de prototype. `fs.watch` n'est qu'une *sonnette* — les agents se réconcilient toujours avec le journal.
+- **L'identité = la session.** Une exécution `claude` distincte est un agent ; ses propres sous-agents constituent cette unique unité de travail (Claude répartit déjà leurs fichiers). La présence vivante est un battement de cœur, complété, lorsqu'il est connu, par `/proc`.
+- **Le garde-fou est un hook.** `PreToolUse` peut avertir — ou bloquer fermement sous `TESSERA_GUARD=1` — *avant* qu'une écriture n'aboutisse, entièrement en espace utilisateur (aucun privilège, aucun `fanotify`).
+
+📖 **Pour aller plus loin :** tout le raisonnement derrière chaque choix — ce que nous avons essayé et rejeté, et pourquoi il reste rapide et léger — se trouve dans **[docs/RATIONALE.md](docs/RATIONALE.md)**.
+
+---
 
 ## Installation
 
 ```bash
 git clone <repo-url> tessera && cd tessera
-node bin/tessera.mjs install --global      # merge hooks into ~/.claude/settings.json (auto-backed-up); fires everywhere
-# dormant (~ms sh pre-filter) in every project until one opts in:
+node bin/tessera.mjs install --global      # add the hooks to ~/.claude/settings.json (auto-backed-up); fires everywhere
+# dormant (~ms shell pre-filter) in every project until one opts in:
 node bin/tessera.mjs install --scope .      # opt THIS project in (creates .tessera/, gitignores it)
 node bin/tessera.mjs install --uninstall    # remove the hooks (the skill dir and per-scope .tessera/ are left in place)
 ```
-**Prérequis :** Linux, **node ≥18**, la CLI [Claude Code](https://docs.claude.com/en/docs/claude-code) et `git` ; `tmux` est optionnel (à défaut, le lanceur se rabat sur un lancement détaché). Pour utiliser `tessera` directement, exécutez `npm link` (ou `npm install -g .`) dans le dépôt — le champ `bin` est déjà configuré — ou créez un lien symbolique de `bin/tessera.mjs` dans votre `PATH`. Il n'y a aucune dépendance npm à installer.
 
-## Utilisation — lancer et surveiller de nombreux agents
+**Prérequis :** Linux, **node ≥18**, la CLI [Claude Code](https://docs.claude.com/en/docs/claude-code) et `git` ; `tmux` est optionnel (le lanceur se rabat sur un spawn détaché en son absence). Pour utiliser `tessera` directement, exécutez `npm link` (ou `npm install -g .`) dans le dépôt, ou créez un lien symbolique de `bin/tessera.mjs` sur votre `PATH`. Il n'y a **aucune dépendance npm** à installer.
+
+## Utilisation
 
 ```bash
-tessera up --task "split the API module" -n 3      # 3 agents, SHARED checkout, awareness + overlap warnings
-tessera up --task "migrate to v2" -n 5 --isolated   # 5 agents, each in its own git worktree+branch
-tessera up --task "..." -n 3 --dry-run              # preview predicted collisions, don't launch
-tessera ps --follow                                 # real-time dashboard: who's live, what they touch, overlaps
-tessera ps --all                                    # every participating scope under cwd
+tessera up --task "split the API module" -n 3      # 3 agents, SHARED checkout: awareness board + overlap warnings
+tessera up --task "migrate to v2" -n 5 --isolated   # 5 agents, each in its own git worktree + branch
+tessera up --task "..." -n 3 --dry-run              # preview the predicted collisions, don't launch
+tessera ps --follow                                 # live dashboard: who's active, what they touch, overlaps
+tessera ps --all                                    # every participating scope under the current folder
 tessera kill wave1.2                                # safe teardown (tmux window / process group)
 tessera doctor                                      # health check
 ```
 
-## Ce que vous obtenez automatiquement (via les hooks Claude — sans coopération des agents)
+## Ce que vous obtenez automatiquement
 
-- **SessionStart** → chaque agent s'annonce et reçoit le message *« N autres agents sont actifs ici, touchant X, Y. »*
-- **PreToolUse(Edit/Write/NotebookEdit)** → enregistre ce que chaque agent édite ; si un pair actif touche le **même fichier**, l'agent qui édite reçoit un avertissement de coordination (ou un blocage strict sous `TESSERA_GUARD=1`).
-- **Stop / SessionEnd** → battement de cœur / libération.
+Une fois installé, chaque agent — quelle que soit la façon dont il est lancé — participe sans effort supplémentaire :
 
-L'unité de coordination est la **session d'agent** (une invocation `claude` distincte). Le bus est en ajout seul, résistant aux plantages (l'encadrement par `\n` en tête répare automatiquement les écritures interrompues), protégé contre la pollution de prototype et dédupliqué. L'identité est l'identifiant de session ; la vivacité repose sur le battement de cœur et (lorsqu'il est connu) `/proc`.
+- **Au démarrage** → il s'annonce et se voit signaler *« N autres agents sont actifs ici, touchant à X, Y. »*
+- **Avant chaque modification** (`Edit` / `Write` / `NotebookEdit`) → il consigne ce à quoi il touche ; si un pair vivant est sur le **même fichier**, il reçoit un avertissement de coordination (ou un blocage ferme sous `TESSERA_GUARD=1`).
+- **À l'arrêt / à la fin** → battement de cœur et libération.
 
-## Portée des garanties
+## Garanties et limites
 
-Hôte Linux unique, un seul uid, système de fichiers local (les verrous consultatifs et inotify ne sont pas fiables sur NFS). Tessera défend l'**intégrité des données** et le **ciblage correct de la fermeture** ; il ne défend **pas** contre un processus malveillant du même uid et ne protège pas les *valeurs* secrètes — dit clairement, sans faire semblant. Coordonner des agents sur *différentes machines* est une couche optionnelle prévue (un transport réseau sur un VPN maillé) ; aujourd'hui, le bus de fichiers local est toute l'histoire, délibérément.
+Un seul hôte Linux, un seul utilisateur, système de fichiers local (les verrous consultatifs et inotify ne sont pas fiables sur NFS). Tessera défend l'**intégrité des données** et le **ciblage correct des arrêts** ; il ne défend **pas** contre un processus malveillant du même utilisateur, ni ne protège les *valeurs* secrètes — dit clairement, sans faire semblant. Coordonner des agents entre *machines différentes* est une couche optionnelle prévue (un transport réseau sur un VPN maillé) ; aujourd'hui, le tableau local est toute l'histoire, délibérément. Voir [`docs/ROADMAP.md`](docs/ROADMAP.md) et [`docs/DESIGN.md`](docs/DESIGN.md).
 
-## Disposition
+## Travaux connexes
 
-```
-lib/      scope · identity · bus · proc · coord · config · args
-hooks/    tessera-hook.sh (fast pre-filter) → tessera-hook.mjs (handler)
-cmd/      install · up · ps · kill · doctor
-bin/      tessera.mjs
-test/     selftest.mjs · dummy-agent.mjs
-docs/     DESIGN.md
-```
+Les orchestrateurs axés sur l'isolation — **uzi**, **claude-squad**, **vibe-kanban**, **Conductor** — donnent à chaque agent son propre worktree/espace de travail et reportent les conflits à `git merge` ; **claude-flow** coordonne les sous-agents qu'*il* orchestre via un lourd tableau noir SQLite partagé. Tessera est la fine couche de visibilité entre pairs, à zéro dépendance, pour un *checkout partagé* — et puisque ces outils exécutent tous le vrai Claude Code, les hooks de Tessera se déclenchent aussi à l'intérieur d'eux, de sorte qu'il **se compose** avec eux plutôt que de les concurrencer.
 
 ## Licence
 

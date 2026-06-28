@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="320" viewBox="0 0 880 320" font-family="DejaVu Sans, Arial, sans-serif">
+  <rect x="1" y="1" width="878" height="318" rx="20" fill="#0f172a" stroke="#1e293b" stroke-width="2"/>
+  <text x="40" y="46" font-size="18" font-weight="700" fill="#94a3b8">Per-folder scope — agents in different projects never see each other</text>
+
+  <!-- LEFT project: web-app -->
+  <rect x="40" y="70" width="360" height="200" rx="14" fill="#0e1b2a" stroke="#334155" stroke-width="2"/>
+  <rect x="62" y="86" width="150" height="30" rx="15" fill="#0b2740" stroke="#38bdf8" stroke-width="1.5"/>
+  <text x="78" y="106" font-size="15" font-weight="700" fill="#7dd3fc">web-app/</text>
+  <rect x="62" y="128" width="316" height="124" rx="6" fill="#14342a"/>
+  <text x="82" y="152" font-size="13" fill="#7fae93" letter-spacing="1">SHARED BOARD</text>
+  <circle cx="90" cy="184" r="6" fill="#38bdf8"/>
+  <text x="106" y="190" font-size="15.5" fill="#e6f0e8">agent A · editing <tspan font-weight="700" fill="#fff">app.tsx</tspan></text>
+  <circle cx="90" cy="220" r="6" fill="#34d399"/>
+  <text x="106" y="226" font-size="15.5" fill="#e6f0e8">agent B · editing <tspan font-weight="700" fill="#fff">styles.css</tspan></text>
+
+  <!-- RIGHT project: api-service -->
+  <rect x="480" y="70" width="360" height="200" rx="14" fill="#0e1b2a" stroke="#334155" stroke-width="2"/>
+  <rect x="502" y="86" width="170" height="30" rx="15" fill="#231640" stroke="#a78bfa" stroke-width="1.5"/>
+  <text x="518" y="106" font-size="15" font-weight="700" fill="#c4b5fd">api-service/</text>
+  <rect x="502" y="128" width="316" height="124" rx="6" fill="#14342a"/>
+  <text x="522" y="152" font-size="13" fill="#7fae93" letter-spacing="1">SHARED BOARD</text>
+  <circle cx="530" cy="184" r="6" fill="#a78bfa"/>
+  <text x="546" y="190" font-size="15.5" fill="#e6f0e8">agent C · editing <tspan font-weight="700" fill="#fff">server.go</tspan></text>
+  <circle cx="530" cy="220" r="6" fill="#fbbf24"/>
+  <text x="546" y="226" font-size="15.5" fill="#e6f0e8">agent D · editing <tspan font-weight="700" fill="#fff">db.go</tspan></text>
+
+  <!-- divider wall + "invisible" badge -->
+  <line x1="440" y1="78" x2="440" y2="262" stroke="#475569" stroke-width="2" stroke-dasharray="5 6"/>
+  <circle cx="440" cy="170" r="26" fill="#0f172a" stroke="#64748b" stroke-width="2.5"/>
+  <line x1="424" y1="154" x2="456" y2="186" stroke="#64748b" stroke-width="2.5"/>
+  <circle cx="440" cy="170" r="11" fill="none" stroke="#64748b" stroke-width="2.5"/>
+
+  <text x="440" y="300" font-size="15.5" fill="#94a3b8" text-anchor="middle">Different folder → different board → <tspan font-weight="700" fill="#cbd5e1">mutually invisible</tspan>. No cross-project noise.</text>
+</svg>
