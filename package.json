@@ -1,0 +1,9 @@
+{
+  "name": "agentsync",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": { "agentsync": "bin/agentsync.mjs" },
+  "description": "Portable per-scope coordination for concurrent local Claude Code agents: append-only awareness bus + git worktrees + flock for shared non-mergeable files + Claude hooks. Zero runtime dependencies.",
+  "license": "MIT",
+  "engines": { "node": ">=18" }
+}

@@ -1,0 +1,4 @@
+node_modules/
+*.agentsync-bak
+.agentsync/
+*.log
