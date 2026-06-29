@@ -6,8 +6,9 @@ import { readFileSync } from 'node:fs'
 import { scopeRoot } from '../lib/scope.mjs'
 import { loadConfig } from '../lib/config.mjs'
 import {
-  participates, announce, heartbeat, recordEdit, done, overlapWarning, readPresence,
+  participates, announce, heartbeat, recordEdit, done, overlapWarning, readPresence, ensureScope,
 } from '../lib/coord.mjs'
+import { sessionTouch, sessionPeers, recordAutoScope } from '../lib/registry.mjs'
 
 function readStdin() {
   try { return JSON.parse(readFileSync(0, 'utf8')) } catch { return {} }
@@ -33,9 +34,25 @@ try {
   if (ev === 'SessionStart') {
     const scope = scopeRoot(cwd)
     const cfg = loadConfig(scope)
+    let autoNote = ''
+    // F safety net (TESSERA_NUDGE!=0): register in the global session registry; if another
+    // LIVE agent already shares this scope but it isn't opted-in, AUTO-opt-in this one repo
+    // so the collision that's now possible is actually coordinated. Best-effort: any failure
+    // degrades to plain opt-in (silent, safe). See docs/ACTIVATION.md.
+    if (process.env.TESSERA_NUDGE !== '0') {
+      sessionTouch(id, scope, process.pid)
+      if (!participates(scope, cfg) && sessionPeers(scope, id).length >= 1) {
+        try {
+          ensureScope(scope, cfg, { auto: true })
+          recordAutoScope(scope)
+          autoNote = `\nTessera: another live agent is working in this project — coordination AUTO-ENABLED here (.tessera/). Keep it: \`tessera install --scope .\`  ·  undo: \`tessera clean\`.`
+        } catch {}
+      }
+    }
     if (!participates(scope, cfg)) pass()
     const digest = announce(scope, cfg, id, { cwd, label, task, role: process.env.TESSERA_ROLE || 'agent' })
-    if (digest) out({ hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: digest } })
+    const msg = (digest || '') + autoNote
+    if (msg) out({ hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: msg } })
     pass()
   }
 

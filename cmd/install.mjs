@@ -62,12 +62,16 @@ export async function run(argv, { HOOK }) {
         if (matcher) entry.matcher = matcher
         settings.hooks[ev].push(entry)
       }
-    }
+      // Arm the auto-opt-in safety net by default: at SessionStart, a project with ≥2 live
+      // agents that isn't opted-in gets coordination enabled automatically. TESSERA_NUDGE=0
+      // disables it (pure per-scope opt-in). See docs/ACTIVATION.md.
+      settings.env ||= {}; settings.env.TESSERA_NUDGE = '1'
+    } else if (settings.env) { delete settings.env.TESSERA_NUDGE }
     if (a.auto) { settings.env ||= {}; settings.env.TESSERA_AUTO = '1' }
     writeFileSync(settingsPath, JSON.stringify(settings, null, 2))
     console.log(a.uninstall
       ? `✓ removed Tessera hooks from ${settingsPath}`
-      : `✓ installed Tessera hooks (SessionStart, PreToolUse[${HOOK_EVENTS.PreToolUse}], Stop, SubagentStop, SessionEnd) into ${settingsPath}`)
+      : `✓ installed Tessera hooks (SessionStart, PreToolUse[${HOOK_EVENTS.PreToolUse}], Stop, SubagentStop, SessionEnd) into ${settingsPath}\n  · auto-opt-in safety net armed (TESSERA_NUDGE=1): a project with ≥2 live agents auto-enables coordination. \`tessera clean\` undoes it; TESSERA_NUDGE=0 disables.`)
     if (!a.uninstall) installSkill()
   }
 

@@ -7,6 +7,7 @@ import { homedir, platform } from 'node:os'
 import { parseArgs } from '../lib/args.mjs'
 import { realpathM, scopeRoot, tesseraDir, enclosingGitRoot, busPath } from '../lib/scope.mjs'
 import { loadConfig } from '../lib/config.mjs'
+import { sessionPeers } from '../lib/registry.mjs'
 
 export async function run(argv) {
   const a = parseArgs(argv, { booleans: ['all'] })
@@ -20,7 +21,16 @@ export async function run(argv) {
   console.log(`Tessera doctor — scope ${scope}`)
   platform() === 'linux' ? ok('platform linux (full features)') : wf(`platform ${platform()} — awareness only; kernel features (flock holders, /proc, pgrp kill) are Linux-only`)
 
-  existsSync(tesseraDir(scope, cfg)) ? ok('.tessera present (scope opted-in)') : wf('.tessera absent — run: tessera install --scope .')
+  const optedIn = existsSync(tesseraDir(scope, cfg))
+  optedIn ? ok('.tessera present (scope opted-in)') : wf('.tessera absent — run: tessera install --scope . (or let the safety net auto-enable on a collision)')
+
+  // F activation model: is the auto-opt-in safety net armed, and are other live agents here?
+  const nudge = process.env.TESSERA_NUDGE !== '0'
+  nudge ? ok('auto-opt-in safety net armed (TESSERA_NUDGE; set =0 for pure opt-in)') : wf('auto-opt-in safety net OFF (TESSERA_NUDGE=0) — only explicit opt-in coordinates')
+  let peers = []
+  try { peers = sessionPeers(scope, '__doctor__') } catch {}
+  if (peers.length) wf(`${peers.length} other live agent(s) registered in this scope — ${optedIn ? 'coordination active' : 'would auto-enable on the next agent\'s SessionStart'}`)
+  else ok('no other live agents registered in this scope (solo)')
 
   const git = enclosingGitRoot(scope)
   if (git) {

@@ -1,20 +1,28 @@
 #!/bin/sh
 # Fast pre-filter so the GLOBAL hook is a near-zero-cost no-op in projects that
 # don't use Tessera (avoids ~40ms node startup on every tool call everywhere).
-# If the project clearly participates, exec the real node handler (which inherits
-# stdin). Otherwise consume stdin and exit 0 without starting node.
+# The EDIT hot path (PreToolUse/Stop/...) only starts node where the project
+# participates. SessionStart ALWAYS starts node — once per session — so a lone
+# agent registers in the global session registry and a 2nd agent can detect it
+# (the auto-opt-in safety net). See docs/ACTIVATION.md.
 DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+input=$(cat)
 
+# SessionStart: always run node (registry heartbeat + collision detection).
+case "$input" in
+  *'"SessionStart"'*) printf '%s' "$input" | node "$DIR/tessera-hook.mjs"; exit 0 ;;
+esac
+
+# Everything else: participation gate — only run node where the project opted in.
 if [ "$TESSERA_AUTO" = "1" ] || [ -n "$TESSERA_TOUCHES" ]; then
-  exec node "$DIR/tessera-hook.mjs"
+  printf '%s' "$input" | node "$DIR/tessera-hook.mjs"; exit 0
 fi
 
 d="$PWD"
 while [ -n "$d" ]; do
-  if [ -d "$d/.tessera" ]; then exec node "$DIR/tessera-hook.mjs"; fi
+  if [ -d "$d/.tessera" ]; then printf '%s' "$input" | node "$DIR/tessera-hook.mjs"; exit 0; fi
   [ "$d" = "/" ] && break
   d=$(dirname -- "$d")
 done
 
-cat >/dev/null 2>&1
 exit 0
