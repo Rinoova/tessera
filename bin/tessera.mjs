@@ -25,15 +25,18 @@ USAGE
       Live agents per scope (kernel/heartbeat-verified), what each is touching, overlaps. --follow = real-time.
 
   tessera kill <label>            Safe teardown of a launched agent (tmux window / process group).
-  tessera doctor [--scope DIR] [--all]   Health check (ignore-confirmed, hooks installed, platform, safety net).
+  tessera doctor [--scope DIR] [--all]   Health check (ignore-confirmed, hooks installed, platform, safety net, bus size).
   tessera clean                   Undo every scope the auto-opt-in safety net enabled (removes auto-created .tessera/).
+  tessera gc [--scope DIR] [--all] [--keep N] [--max-age DAYS] [--dry-run] [--force]
+      Offline maintenance: compact the append-only bus (keep last N=5000 / newer than DAYS=14)
+      and reap dead presence files. --dry-run previews; refuses while live peers exist (--force overrides).
 
 Scope = nearest project root (markers: .tessera-scope, .git, package.json, go.mod, pyproject.toml, ...).
 Two agents coordinate only where their paths overlap; different projects stay mutually invisible.`
 
 const cmd = process.argv[2]
 const rest = process.argv.slice(3)
-const KNOWN = new Set(['install', 'up', 'ps', 'kill', 'doctor', 'clean'])
+const KNOWN = new Set(['install', 'up', 'ps', 'kill', 'doctor', 'clean', 'gc'])
 
 if (!cmd || cmd === 'help' || cmd === '--help' || cmd === '-h') { console.log(HELP); process.exit(0) }
 if (!KNOWN.has(cmd)) { console.error(`unknown command: ${cmd}\n`); console.log(HELP); process.exit(1) }

@@ -2,8 +2,8 @@
 // Reads hook JSON on stdin, dispatches on hook_event_name. Awareness mode:
 // announces presence, records what each agent touches, surfaces live peers.
 // FAIL-OPEN: any internal error exits 0 silently so coordination never blocks an agent.
-import { readFileSync } from 'node:fs'
-import { scopeRoot } from '../lib/scope.mjs'
+import { readFileSync, statSync } from 'node:fs'
+import { scopeRoot, busPath } from '../lib/scope.mjs'
 import { loadConfig } from '../lib/config.mjs'
 import {
   participates, announce, heartbeat, recordEdit, done, overlapWarning, readPresence, ensureScope,
@@ -17,6 +17,7 @@ function out(obj) { process.stdout.write(JSON.stringify(obj)); process.exit(0) }
 function pass() { process.exit(0) }
 
 const MUTATORS = /^(Edit|Write|MultiEdit|NotebookEdit)$|^mcp__.*(write|edit|create|put|save)/i
+const BUS_WARN_BYTES = 5 * 1024 * 1024   // SessionStart nudges to run `tessera gc` past this
 
 function targetPath(j) {
   const ti = j.tool_input || {}
@@ -41,7 +42,11 @@ try {
     // degrades to plain opt-in (silent, safe). See docs/ACTIVATION.md.
     if (process.env.TESSERA_NUDGE !== '0') {
       sessionTouch(id, scope, process.pid)
-      if (!participates(scope, cfg) && sessionPeers(scope, id).length >= 1) {
+      // sessionPeers() compacts the global registry as a side effect. Call it UNCONDITIONALLY
+      // (not gated behind !participates) so the GC fires on every SessionStart — otherwise an
+      // opted-in scope's agents never trigger it and sessions.ndjson grows without bound.
+      const peers = sessionPeers(scope, id)
+      if (!participates(scope, cfg) && peers.length >= 1) {
         try {
           ensureScope(scope, cfg, { auto: true })
           recordAutoScope(scope)
@@ -51,7 +56,9 @@ try {
     }
     if (!participates(scope, cfg)) pass()
     const digest = announce(scope, cfg, id, { cwd, label, task, role: process.env.TESSERA_ROLE || 'agent' })
-    const msg = (digest || '') + autoNote
+    let busNote = ''
+    try { const sz = statSync(busPath(scope, cfg)).size; if (sz > BUS_WARN_BYTES) busNote = `\nTessera: bus.ndjson is ${(sz / 1048576).toFixed(1)} MB — run \`tessera gc\` to compact it.` } catch {}
+    const msg = (digest || '') + autoNote + busNote
     if (msg) out({ hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: msg } })
     pass()
   }

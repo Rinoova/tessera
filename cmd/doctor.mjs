@@ -1,7 +1,7 @@
 // doctor — lean health check: ignore-confirmed (git-gated), hooks installed,
 // platform/fs sane. FAIL blocks coordination guarantees; WARN proceeds.
 import { execFileSync } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { homedir, platform } from 'node:os'
 import { parseArgs } from '../lib/args.mjs'
@@ -47,6 +47,11 @@ export async function run(argv) {
     const fst = execFileSync('stat', ['-f', '-c', '%T', tesseraDir(scope, cfg)], { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim()
     const isNet = /nfs|cifs|smb|9p/i.test(fst)
     isNet ? wf(`coordination dir on ${fst} — flock & inotify are unreliable on network filesystems`) : ok(`coordination dir on local fs (${fst})`)
+  } catch {}
+
+  try {
+    const sz = statSync(busPath(scope, cfg)).size
+    sz > 5 * 1024 * 1024 ? wf(`bus.ndjson is ${(sz / 1048576).toFixed(1)} MB — run \`tessera gc\` to compact it`) : ok(`bus.ndjson size OK (${(sz / 1024).toFixed(0)} KB)`)
   } catch {}
 
   console.log(`\n${fail ? `FAIL (${fail} blocking, ${warn} warn)` : warn ? `OK with ${warn} warning(s)` : 'OK — all green'}`)

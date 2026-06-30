@@ -34,6 +34,7 @@ tessera doctor                       # health check
 4. As an agent yourself, before rewriting a hot/shared file, run `tessera ps` to see if a peer is already on it; coordinate (pick a different file, or wait) rather than overwrite.
 
 ## Coordination etiquette for agents
+- **Never `cat`/Read the raw `.tessera/bus.ndjson` or `.tessera/state/agents/*` files** — the bus is an append-only log that can grow large, and reading it wastes tokens. Use `tessera ps` (a bounded current-state summary) instead; the hooks already surface what you need.
 - The SessionStart hook injects "N other agents active here, touching X" — heed it.
 - If a PreToolUse warning says a peer is editing your target file, prefer a different file or a different region, or wait and re-read first.
 - Treat `deploy/`, shared config, and generated singletons as high-collision; coordinate explicitly there.
